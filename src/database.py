@@ -21,6 +21,13 @@ class DatabaseManager:
         }
     
     def get_connection(self):
+        # Always create a fresh connection to avoid stale connection issues
+        try:
+            if self.connection:
+                self.connection.ping(reconnect=True)
+        except:
+            self.connection = None
+
         if not self.connection:
             self.connection = pymysql.connect(**self.config)
         return self.connection

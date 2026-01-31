@@ -1,0 +1,100 @@
+================================================================================
+MINDWORX SOR AUTOMATION - MOODLE PLUGIN INSTALLATION
+================================================================================
+
+REQUEST: Please install the local_sor plugin on the Moodle server.
+
+SERVER: lms.mindworx.co.za/academy
+
+================================================================================
+INSTALLATION STEPS
+================================================================================
+
+STEP 1: Access the Moodle server files
+---------------------------------------
+Connect to the server via FTP, SSH, or cPanel File Manager.
+
+STEP 2: Navigate to the local plugins directory
+---------------------------------------
+Go to: /path/to/moodle/local/
+
+The path is typically one of:
+- /home/[username]/public_html/academy/local/
+- /var/www/html/academy/local/
+- /var/www/moodle/local/
+
+STEP 3: Create the plugin folder
+---------------------------------------
+Create a new folder called "sor" inside the /local/ directory.
+
+STEP 4: Upload the plugin files
+---------------------------------------
+Extract the attached "sor_plugin_files.zip" and upload ALL contents
+to /local/sor/
+
+The final structure should be:
+/local/sor/
+├── version.php
+├── db/
+│   └── services.php
+├── classes/
+│   └── external/
+│       ├── submission_api.php
+│       └── grading_api.php
+└── lang/
+    └── en/
+        └── local_sor.php
+
+STEP 5: Set file permissions (Linux servers)
+---------------------------------------
+chmod -R 755 /path/to/moodle/local/sor/
+
+STEP 6: Trigger Moodle installation
+---------------------------------------
+1. Login to Moodle as administrator
+2. Go to: Site Administration → Notifications
+3. Moodle will detect the new plugin and show an upgrade screen
+4. Click "Upgrade Moodle database now"
+5. Confirm the installation
+
+STEP 7: Verify installation
+---------------------------------------
+1. Go to: Site Administration → Plugins → Plugins overview
+2. Search for "sor" - you should see "local_sor" listed
+3. Go to: Site Administration → Server → Web services → External services
+4. You should see "MindWorx SOR Automation" service listed
+
+================================================================================
+WHAT THIS PLUGIN DOES
+================================================================================
+
+The local_sor plugin adds web service APIs for the SOR Automation System:
+
+- local_sor_get_submission_status  : Check submission status
+- local_sor_submit_sor_file        : Upload SOR PDF files
+- local_sor_get_all_submissions    : Get all submissions for an assignment
+- local_sor_grade_submission       : Grade a single submission
+- local_sor_bulk_grade_submissions : Grade multiple submissions at once
+- local_sor_get_grading_status     : Check grading progress
+- local_sor_release_grades         : Release grades to students
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+If the plugin doesn't appear after installation:
+
+1. Check file permissions (should be readable by web server)
+2. Check Moodle error logs: Site Administration → Reports → Logs
+3. Enable debugging: Site Administration → Development → Debugging
+4. Verify the folder is named exactly "sor" (not "local_sor")
+
+================================================================================
+CONTACT
+================================================================================
+
+For questions about this plugin, contact the SOR Automation team.
+
+Requested by: Sihle Mtshini
+Date: January 29, 2026
+================================================================================
