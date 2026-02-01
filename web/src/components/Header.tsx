@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, ChevronRight, LogOut, User, Settings, Circle, CheckCircle } from 'lucide-react';
+import { Bell, ChevronRight, LogOut, User, Settings, Circle, CheckCircle, X, FileText, AlertCircle, CheckCheck } from 'lucide-react';
+import { useNotifications } from '@/context/NotificationContext';
 
 interface HeaderProps {
   title?: string;
@@ -19,17 +20,23 @@ const statusOptions: { value: UserStatus; label: string; color: string }[] = [
 
 export default function Header({ title }: HeaderProps) {
   const router = useRouter();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, removeNotification } = useNotifications();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [userStatus, setUserStatus] = useState<UserStatus>('available');
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const notificationRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsProfileOpen(false);
         setIsStatusOpen(false);
+      }
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setIsNotificationsOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -39,11 +46,9 @@ export default function Header({ title }: HeaderProps) {
   const currentStatus = statusOptions.find(s => s.value === userStatus)!;
 
   const handleSignOut = () => {
-    // Clear any stored session/token
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
     setIsProfileOpen(false);
-    // Redirect to login page
     router.push('/login');
   };
 
@@ -55,8 +60,21 @@ export default function Header({ title }: HeaderProps) {
   const handleStatusChange = (status: UserStatus) => {
     setUserStatus(status);
     setIsStatusOpen(false);
-    // Here you could also save the status to an API
   };
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'success':
+        return <CheckCircle size={18} className="text-green-500" />;
+      case 'warning':
+        return <AlertCircle size={18} className="text-yellow-500" />;
+      default:
+        return <FileText size={18} className="text-blue-500" />;
+    }
+  };
+
+  // Get only the first 5 notifications for the dropdown
+  const recentNotifications = notifications.slice(0, 5);
 
   return (
     <header className="bg-[#F26522] px-6 py-5">
@@ -69,10 +87,101 @@ export default function Header({ title }: HeaderProps) {
 
         <div className="flex items-center gap-4">
           {/* Notifications */}
-          <button className="relative p-2 text-white hover:bg-orange-600 rounded-full">
-            <Bell size={20} />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-          </button>
+          <div className="relative" ref={notificationRef}>
+            <button
+              onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+              className="relative p-2 text-white hover:bg-orange-600 rounded-full transition-colors"
+            >
+              <Bell size={20} />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-white text-[#F26522] text-xs font-bold rounded-full flex items-center justify-center px-1">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </button>
+
+            {/* Notifications Dropdown */}
+            {isNotificationsOpen && (
+              <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                  <h3 className="font-semibold text-gray-900">Notifications</h3>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={markAllAsRead}
+                      className="text-sm text-[#F26522] hover:underline flex items-center gap-1"
+                    >
+                      <CheckCheck size={14} />
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+
+                {/* Notification List */}
+                <div className="max-h-80 overflow-y-auto">
+                  {recentNotifications.length === 0 ? (
+                    <div className="px-4 py-8 text-center text-gray-500">
+                      <Bell size={32} className="mx-auto mb-2 opacity-50" />
+                      <p>No notifications</p>
+                    </div>
+                  ) : (
+                    recentNotifications.map((notification) => (
+                      <div
+                        key={notification.id}
+                        className={`flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 ${
+                          !notification.read ? 'bg-orange-50' : ''
+                        }`}
+                      >
+                        <div className="mt-0.5">
+                          {getNotificationIcon(notification.type)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className={`text-sm ${!notification.read ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>
+                              {notification.title}
+                            </p>
+                            <button
+                              onClick={() => removeNotification(notification.id)}
+                              className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-0.5 truncate">{notification.message}</p>
+                          <div className="flex items-center justify-between mt-1">
+                            <span className="text-xs text-gray-400">{notification.time}</span>
+                            {!notification.read && (
+                              <button
+                                onClick={() => markAsRead(notification.id)}
+                                className="text-xs text-[#F26522] hover:underline"
+                              >
+                                Mark read
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Footer */}
+                {notifications.length > 0 && (
+                  <div className="px-4 py-3 border-t border-gray-100">
+                    <button
+                      onClick={() => {
+                        setIsNotificationsOpen(false);
+                        router.push('/dashboard/notifications');
+                      }}
+                      className="w-full text-center text-sm text-[#F26522] hover:underline"
+                    >
+                      View all notifications
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* User Profile with Dropdown */}
           <div className="relative" ref={dropdownRef}>
@@ -97,7 +206,7 @@ export default function Header({ title }: HeaderProps) {
               </div>
             </button>
 
-            {/* Dropdown Menu */}
+            {/* Profile Dropdown Menu */}
             {isProfileOpen && (
               <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                 {/* Header with Logo */}
