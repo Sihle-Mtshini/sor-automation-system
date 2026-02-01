@@ -28,7 +28,7 @@ export default function Sidebar() {
             alt="MindWorx"
             className="h-10 mb-2"
           />
-          <span className="text-sm font-semibold text-gray-400">SOR DASHBOARD</span>
+          <span className="text-lg font-semibold text-gray-400">SOR DASHBOARD</span>
         </div>
       </div>
 
