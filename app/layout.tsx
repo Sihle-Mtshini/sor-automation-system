@@ -1,14 +1,9 @@
-import type { Metadata, Viewport } from 'next'
-import './globals.css'
+import type { Metadata } from "next"
+import "./globals.css"
 
 export const metadata: Metadata = {
-  title: 'MindWorx SOR Dashboard',
-  description: 'SOR Automation System Dashboard',
-}
-
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
+  title: "MindWorx SOR Dashboard",
+  description: "SOR Automation System Dashboard",
 }
 
 export default function RootLayout({
