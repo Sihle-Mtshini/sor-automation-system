@@ -75,7 +75,7 @@ function AutoDetectTab({ onComplete }: { onComplete: () => void }) {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<BulkResult | null>(null);
-  const [showOnlyCompleted, setShowOnlyCompleted] = useState(true);
+  const [showOnlyCompleted, setShowOnlyCompleted] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
 
   const fetchCompletions = useCallback(async () => {
@@ -97,7 +97,7 @@ function AutoDetectTab({ onComplete }: { onComplete: () => void }) {
     }
   }, []);
 
-  useEffect(() => { fetchCompletions(); }, [fetchCompletions]);
+  // Don't auto-fetch on load - wait for user to click Refresh
 
   const displayed = showOnlyCompleted ? learners.filter(l => l.completed) : learners;
 
@@ -253,11 +253,16 @@ function AutoDetectTab({ onComplete }: { onComplete: () => void }) {
         <div className="flex items-center justify-center py-16 text-gray-400">
           <RefreshCw size={24} className="animate-spin mr-3" /> Scanning Moodle for completions...
         </div>
+      ) : displayed.length === 0 && learners.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">
+          <Users size={40} className="mx-auto mb-3 opacity-50" />
+          <p>Click &quot;Refresh from Moodle&quot; to scan for enrolled learners.</p>
+          <p className="text-sm mt-1">Make sure your Moodle URL and Token are set in the environment variables.</p>
+        </div>
       ) : displayed.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <Users size={40} className="mx-auto mb-3 opacity-50" />
-          <p>{showOnlyCompleted ? 'No completed learners found.' : 'No enrolled learners found.'}</p>
-          <p className="text-sm mt-1">Check your Moodle connection or try refreshing.</p>
+          <p>{showOnlyCompleted ? 'No completed learners found. Uncheck the filter to see all enrolled learners.' : 'No enrolled learners found.'}</p>
         </div>
       ) : (
         <>
