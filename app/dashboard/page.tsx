@@ -83,7 +83,16 @@ export default function DashboardPage() {
       ]);
 
       if (statsRes.success) {
-        setStats(statsRes.data);
+        const d = statsRes.data;
+        setStats({
+          total: d.total_requests ?? d.total ?? 0,
+          pending: d.pending ?? 0,
+          signature_sent: d.signature_sent ?? 0,
+          signed: d.signed ?? 0,
+          uploaded: d.uploaded ?? 0,
+          failed: d.failed ?? 0,
+          overdue: d.overdue ?? 0,
+        });
       }
       if (requestsRes.success) {
         setRequests(requestsRes.data);
