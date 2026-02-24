@@ -1,5 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+async function moodleCall(moodleUrl: string, token: string, wsfunction: string, params: Record<string, string | number> = {}) {
+  const formData = new URLSearchParams();
+  formData.append('wstoken', token);
+  formData.append('wsfunction', wsfunction);
+  formData.append('moodlewsrestformat', 'json');
+  for (const [key, value] of Object.entries(params)) {
+    formData.append(key, String(value));
+  }
+
+  console.log('[v0] Moodle POST to:', `${moodleUrl}/webservice/rest/server.php`, 'function:', wsfunction);
+
+  const res = await fetch(`${moodleUrl}/webservice/rest/server.php`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: formData.toString(),
+  });
+
+  const text = await res.text();
+  console.log('[v0] Moodle response status:', res.status, 'body (first 300):', text.substring(0, 300));
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Invalid Moodle response: ${text.substring(0, 200)}`);
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -8,8 +35,8 @@ export async function GET(request: NextRequest) {
     const moodleUrl = (process.env.MOODLE_URL || '').replace(/\/+$/, '');
     const moodleToken = (process.env.MOODLE_TOKEN || '').trim();
 
-    console.log('[v0] MOODLE_URL set:', !!moodleUrl, 'length:', moodleUrl.length);
-    console.log('[v0] MOODLE_TOKEN set:', !!moodleToken, 'length:', moodleToken.length);
+    console.log('[v0] MOODLE_URL:', moodleUrl ? `${moodleUrl.substring(0, 30)}...` : 'NOT SET');
+    console.log('[v0] MOODLE_TOKEN length:', moodleToken.length);
 
     if (!moodleUrl || !moodleToken) {
       return NextResponse.json(
@@ -18,27 +45,25 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const targetCourseId = courseId || '2';
-
-    // Get enrolled users from Moodle
-    const enrolledUrl = `${moodleUrl}/webservice/rest/server.php?wstoken=${moodleToken}&wsfunction=core_enrol_get_enrolled_users&moodlewsrestformat=json&courseid=${targetCourseId}`;
+    // First test the connection
+    const siteInfo = await moodleCall(moodleUrl, moodleToken, 'core_webservice_get_site_info');
     
-    console.log('[v0] Moodle enrolled URL:', enrolledUrl.replace(moodleToken, '***'));
-    
-    const enrolledRes = await fetch(enrolledUrl);
-    const enrolledText = await enrolledRes.text();
-    console.log('[v0] Moodle response status:', enrolledRes.status);
-    console.log('[v0] Moodle response (first 500 chars):', enrolledText.substring(0, 500));
-    
-    let enrolledUsers;
-    try {
-      enrolledUsers = JSON.parse(enrolledText);
-    } catch {
+    if (siteInfo?.exception) {
+      console.log('[v0] Moodle auth error:', siteInfo.message, siteInfo.errorcode);
       return NextResponse.json(
-        { success: false, error: `Invalid Moodle response: ${enrolledText.substring(0, 200)}` },
-        { status: 500 }
+        { success: false, error: `Moodle auth error: ${siteInfo.message}. Check your MOODLE_TOKEN env var.` },
+        { status: 401 }
       );
     }
+
+    console.log('[v0] Connected to Moodle:', siteInfo?.sitename);
+
+    const targetCourseId = courseId || '2';
+
+    // Get enrolled users from Moodle using POST
+    const enrolledUsers = await moodleCall(moodleUrl, moodleToken, 'core_enrol_get_enrolled_users', {
+      courseid: targetCourseId,
+    });
 
     if (enrolledUsers?.exception) {
       return NextResponse.json(
@@ -47,23 +72,27 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (!Array.isArray(enrolledUsers)) {
+    if (!Array.isArray(enrolledUsers) || enrolledUsers.length === 0) {
       return NextResponse.json({
         success: true,
         data: [],
-        message: 'No enrolled users found',
+        total: 0,
+        completed_count: 0,
+        message: `No enrolled users found for course ${targetCourseId}`,
       });
     }
+
+    console.log('[v0] Found', enrolledUsers.length, 'enrolled users');
 
     // Get course completion status for each user
     const completions = [];
 
     for (const user of enrolledUsers) {
       try {
-        const completionUrl = `${moodleUrl}/webservice/rest/server.php?wstoken=${moodleToken}&wsfunction=core_completion_get_course_completion_status&moodlewsrestformat=json&courseid=${targetCourseId}&userid=${user.id}`;
-        
-        const completionRes = await fetch(completionUrl);
-        const completionData = await completionRes.json();
+        const completionData = await moodleCall(moodleUrl, moodleToken, 'core_completion_get_course_completion_status', {
+          courseid: targetCourseId,
+          userid: user.id,
+        });
 
         const isComplete = completionData?.completionstatus?.completed === true;
 
@@ -74,12 +103,11 @@ export async function GET(request: NextRequest) {
           fullname: user.fullname || `${user.firstname || ''} ${user.lastname || ''}`.trim(),
           email: user.email || '',
           completed: isComplete,
-          completion_date: completionData?.completionstatus?.timecompleted 
+          completion_date: completionData?.completionstatus?.timecompleted
             ? new Date(completionData.completionstatus.timecompleted * 1000).toISOString()
             : null,
         });
       } catch {
-        // If completion check fails for a user, still include them
         completions.push({
           id: user.id,
           firstname: user.firstname || '',
@@ -99,7 +127,7 @@ export async function GET(request: NextRequest) {
       completed_count: completions.filter(c => c.completed).length,
     });
   } catch (error) {
-    console.error('Moodle completions error:', error);
+    console.error('[v0] Moodle completions error:', error);
     return NextResponse.json(
       { success: false, error: String(error) },
       { status: 500 }
